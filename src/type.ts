@@ -26,3 +26,5 @@ export type UpdateOption<State, Notifier extends boolean = true> = {
 interface VisibelNotifier {
   notifyListener(): void;
 }
+
+export type ItemKeys<State> = Array<keyof State>;

@@ -4,6 +4,7 @@ import {
   SliceDataSubscriber,
   Store,
   UpdateOption,
+  ItemKeys,
 } from './type.js';
 
 export function createStore<RootDataShape>(
@@ -20,23 +21,23 @@ export function createStore<RootDataShape>(
     UpdateOption<RootDataShape, true>
   >();
 
-  function createUpdateListener<Slices extends Array<keyof RootDataShape>>(
-    slices: Array<keyof RootDataShape>,
+  function createUpdateListener<Slices extends ItemKeys<RootDataShape>>(
+    slices: ItemKeys<RootDataShape>,
     listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>,
     showNotifier: true
   ): UpdateOption<RootDataShape, true>;
-  function createUpdateListener<Slices extends Array<keyof RootDataShape>>(
-    slices: Array<keyof RootDataShape>,
+  function createUpdateListener<Slices extends ItemKeys<RootDataShape>>(
+    slices: ItemKeys<RootDataShape>,
     listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>,
     showNotifier: false
   ): UpdateOption<RootDataShape, false>;
-  function createUpdateListener<Slices extends Array<keyof RootDataShape>>(
-    slices: Array<keyof RootDataShape>,
+  function createUpdateListener<Slices extends ItemKeys<RootDataShape>>(
+    slices: ItemKeys<RootDataShape>,
     listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>,
     showNotifier: boolean
   ): UpdateOption<RootDataShape, boolean>;
-  function createUpdateListener<Slices extends Array<keyof RootDataShape>>(
-    slices: Array<keyof RootDataShape>,
+  function createUpdateListener<Slices extends ItemKeys<RootDataShape>>(
+    slices: ItemKeys<RootDataShape>,
     listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>,
     showNotifier = true
   ): UpdateOption<RootDataShape, typeof showNotifier> {
@@ -73,7 +74,7 @@ export function createStore<RootDataShape>(
   }
 
   function subscriber(
-    slices: Array<keyof RootDataShape>,
+    slices: ItemKeys<RootDataShape>,
     listener: SliceDataSubscriber<RootDataShape>
   ) {
     const subscriberOption = createUpdateListener(slices, listener, true);
@@ -87,16 +88,16 @@ export function createStore<RootDataShape>(
     _rootState = immutableShallowMergeState(_rootState, updates);
 
     if (_rootState) {
-      prepUpdateForDispatch(Object.keys(updates) as Array<keyof RootDataShape>);
+      prepUpdateForDispatch(Object.keys(updates) as ItemKeys<RootDataShape>);
     }
   }
 
-  function prepUpdateForDispatch(changed: Array<keyof RootDataShape>) {
+  function prepUpdateForDispatch(changed: ItemKeys<RootDataShape>) {
     const readyUpdateSubscribers = assembleSubscribersForUpdate(changed);
     return storeUpdateNotifier(getUpdatesOption(readyUpdateSubscribers));
   }
 
-  function assembleSubscribersForUpdate(changes: Array<keyof RootDataShape>) {
+  function assembleSubscribersForUpdate(changes: ItemKeys<RootDataShape>) {
     return new Set(
       changes.flatMap((change) => Array.from(subscribeRecord.get(change) ?? []))
     );
@@ -127,7 +128,7 @@ export function createStore<RootDataShape>(
       listenerStore.add(listener);
     });
 
-    return function detach(parts: Array<keyof RootDataShape>) {
+    return function detach(parts: ItemKeys<RootDataShape>) {
       parts.forEach((part) => {
         if (stores.has(part)) {
           stores.get(part)!.delete(listener);
@@ -137,7 +138,7 @@ export function createStore<RootDataShape>(
     };
   }
 
-  function initUpdateEntry(keys: Array<keyof RootDataShape>) {
+  function initUpdateEntry(keys: ItemKeys<RootDataShape>) {
     function listenerEntry(key: keyof RootDataShape) {
       let listeners: SliceDataSubscriberStore<RootDataShape> =
         subscribeRecord.has(key) ? subscribeRecord.get(key)! : new Set();
@@ -150,11 +151,11 @@ export function createStore<RootDataShape>(
 
   function getRootLevelState() {
     return sliceState(
-      _rootState ? (Object.keys(_rootState) as Array<keyof RootDataShape>) : []
+      _rootState ? (Object.keys(_rootState) as ItemKeys<RootDataShape>) : []
     );
   }
 
-  function sliceState<K extends Array<keyof RootDataShape>>(sliceKeys: K) {
+  function sliceState<K extends ItemKeys<RootDataShape>>(sliceKeys: K) {
     return _rootState ? take(_rootState, sliceKeys) : null;
   }
 

@@ -22,10 +22,7 @@ export function createStore(initial) {
             applyUpdateToRootLevel(take(slicePart, Array.from(slices)));
         }
         function getSlicePart() {
-            if (_rootState) {
-                return take(_rootState, Array.from(dataKeys));
-            }
-            return null;
+            return _rootState ? take(_rootState, Array.from(dataKeys)) : null;
         }
         function notifyListener() {
             listener(getSlicePart());
@@ -45,8 +42,9 @@ export function createStore(initial) {
         };
     }
     function subscriber(slices, listener) {
-        prioritySubscriberUpdateQueue.set(listener, createUpdateListener(slices, listener, true));
-        const _a = prioritySubscriberUpdateQueue.get(listener), { notifyListener } = _a, options = __rest(_a, ["notifyListener"]);
+        const subscriberOption = createUpdateListener(slices, listener, true);
+        prioritySubscriberUpdateQueue.set(listener, subscriberOption);
+        const { notifyListener } = subscriberOption, options = __rest(subscriberOption, ["notifyListener"]);
         return options;
     }
     function applyUpdateToRootLevel(updates) {
@@ -97,12 +95,15 @@ export function createStore(initial) {
         return new Map(keys.map(listenerEntry));
     }
     function getRootLevelState() {
-        if (_rootState) {
-            return immutableShallowMergeState(null, _rootState);
-        }
-        else {
-            return null;
-        }
+        return sliceState(_rootState ? Object.keys(_rootState) : []);
     }
-    return { subscriber, getRootLevelState };
+    function sliceState(sliceKeys) {
+        return _rootState ? take(_rootState, sliceKeys) : null;
+    }
+    return {
+        subscriber,
+        sliceState,
+        getRootLevelState,
+        setRootLevelState: applyUpdateToRootLevel,
+    };
 }
