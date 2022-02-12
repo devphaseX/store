@@ -7,9 +7,9 @@ import {
 } from './type.js';
 
 export function createStore<RootDataShape>(
-  initial?: RootDataShape
+  initial?: Partial<RootDataShape>
 ): Store<RootDataShape> {
-  let _rootState: RootDataShape | null = initial ?? null;
+  let _rootState = initial ?? null;
   const subscribeRecord = new Map<
     keyof RootDataShape,
     SliceDataSubscriberStore<RootDataShape>
@@ -45,14 +45,11 @@ export function createStore<RootDataShape>(
     const unsubscriber = subscribeListener(listener, updateEntries, dataKeys);
 
     function setSlicePart(slicePart: Pick<RootDataShape, typeof slices[0]>) {
-      applyUpdateToRootLevel(slicePart);
+      applyUpdateToRootLevel(take(slicePart, Array.from(slices)));
     }
 
     function getSlicePart(): Partial<RootDataShape> | null {
-      if (_rootState) {
-        return take(_rootState, Array.from(dataKeys));
-      }
-      return null;
+      return _rootState ? take(_rootState, Array.from(dataKeys)) : null;
     }
 
     function notifyListener() {
@@ -79,15 +76,11 @@ export function createStore<RootDataShape>(
     slices: Array<keyof RootDataShape>,
     listener: SliceDataSubscriber<RootDataShape>
   ) {
-    prioritySubscriberUpdateQueue.set(
-      listener,
-      createUpdateListener(slices, listener, true)
-    );
+    const subscriberOption = createUpdateListener(slices, listener, true);
+    prioritySubscriberUpdateQueue.set(listener, subscriberOption);
 
-    const { notifyListener, ...options } =
-      prioritySubscriberUpdateQueue.get(listener)!;
-
-    return options!;
+    const { notifyListener, ...options } = subscriberOption;
+    return options;
   }
 
   function applyUpdateToRootLevel(updates: Partial<RootDataShape>) {
@@ -148,19 +141,29 @@ export function createStore<RootDataShape>(
     function listenerEntry(key: keyof RootDataShape) {
       let listeners: SliceDataSubscriberStore<RootDataShape> =
         subscribeRecord.has(key) ? subscribeRecord.get(key)! : new Set();
+
       subscribeRecord.set(key, listeners);
       return [key, listeners] as const;
     }
     return new Map(keys.map(listenerEntry));
   }
 
-  function getRootLevelState<Slice extends keyof RootDataShape>(slice: Slice) {
+  function getRootLevelState() {
     if (_rootState) {
-      return _rootState[slice];
+      return immutableShallowMergeState(null, _rootState);
     } else {
       return null;
     }
   }
 
-  return { subscriber, getRootLevelState };
+  function sliceState<K extends Array<keyof RootDataShape>>(sliceKeys: K) {
+    return _rootState ? take(_rootState, sliceKeys) : null;
+  }
+
+  return {
+    subscriber,
+    sliceState,
+    getRootLevelState,
+    setRootLevelState: applyUpdateToRootLevel,
+  };
 }

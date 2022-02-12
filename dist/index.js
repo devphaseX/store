@@ -19,7 +19,7 @@ export function createStore(initial) {
         const updateEntries = initUpdateEntry(slices);
         const unsubscriber = subscribeListener(listener, updateEntries, dataKeys);
         function setSlicePart(slicePart) {
-            applyUpdateToRootLevel(slicePart);
+            applyUpdateToRootLevel(take(slicePart, Array.from(slices)));
         }
         function getSlicePart() {
             if (_rootState) {
@@ -96,9 +96,9 @@ export function createStore(initial) {
         }
         return new Map(keys.map(listenerEntry));
     }
-    function getRootLevelState(slice) {
+    function getRootLevelState() {
         if (_rootState) {
-            return _rootState[slice];
+            return immutableShallowMergeState(null, _rootState);
         }
         else {
             return null;

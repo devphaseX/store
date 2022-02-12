@@ -1,10 +1,14 @@
 export interface Store<Root> {
-  subscriber(
-    slice: Array<keyof Root>,
-    dataUpdateListener: SliceDataSubscriber<Root>
-  ): UpdateOption<Root, false>;
+  subscriber<Slices extends Array<keyof Root>>(
+    slice: Slices,
+    dataUpdateListener: SliceDataSubscriber<Pick<Root, Slices[number]>>
+  ): UpdateOption<Pick<Root, Slices[number]>, false>;
 
-  getRootLevelState<Slice extends keyof Root>(key: Slice): Root[Slice] | null;
+  getRootLevelState(): Partial<Root> | null;
+  setRootLevelState(state: Partial<Root>): void;
+  sliceState<Slices extends Array<keyof Root>>(
+    keys: Slices
+  ): Partial<Pick<Root, Slices[number]>> | null;
 }
 
 export interface SliceDataSubscriber<State> {
