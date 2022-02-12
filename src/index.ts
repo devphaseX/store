@@ -70,7 +70,7 @@ export function createStore<RootDataShape>(
     };
   }
 
-  function registerListener(
+  function createListenerEntry(
     slices: ItemKeys<RootDataShape>,
     listener: SliceDataSubscriber<RootDataShape>,
     priorityQueue: PriorityUpdateQueue<RootDataShape>
@@ -87,7 +87,7 @@ export function createStore<RootDataShape>(
     slices: ItemKeys<RootDataShape>,
     listener: SliceDataSubscriber<RootDataShape>
   ) {
-    const [updateOption, newPriorityQueue] = registerListener(
+    const [updateOption, newPriorityQueue] = createListenerEntry(
       slices,
       listener,
       prioritySubscriberUpdateQueue
