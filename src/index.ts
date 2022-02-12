@@ -49,9 +49,9 @@ export function createStore<RootDataShape>(
       applyUpdateToRootLevel(take(slicePart, Array.from(slices)));
     }
 
-    function getSlicePart(): Partial<RootDataShape> | null {
-      return _rootState ? take(_rootState, Array.from(dataKeys)) : null;
-    }
+    const getSlicePart = function () {
+      return sliceState(Array.from(dataKeys));
+    };
 
     function notifyListener() {
       listener(getSlicePart() as any);

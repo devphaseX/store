@@ -21,9 +21,9 @@ export function createStore(initial) {
         function setSlicePart(slicePart) {
             applyUpdateToRootLevel(take(slicePart, Array.from(slices)));
         }
-        function getSlicePart() {
-            return _rootState ? take(_rootState, Array.from(dataKeys)) : null;
-        }
+        const getSlicePart = function () {
+            return sliceState(Array.from(dataKeys));
+        };
         function notifyListener() {
             listener(getSlicePart());
         }
