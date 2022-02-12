@@ -3,7 +3,6 @@ export function getFreeVariable<T>(closeOverFn: () => T) {
     return closeOverFn();
   };
 }
-
 export function immutableShallowMergeState<State>(
   oldState: State | null,
   newState: Partial<State>
