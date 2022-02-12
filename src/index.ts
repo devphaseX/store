@@ -149,11 +149,9 @@ export function createStore<RootDataShape>(
   }
 
   function getRootLevelState() {
-    if (_rootState) {
-      return immutableShallowMergeState(null, _rootState);
-    } else {
-      return null;
-    }
+    return sliceState(
+      _rootState ? (Object.keys(_rootState) as Array<keyof RootDataShape>) : []
+    );
   }
 
   function sliceState<K extends Array<keyof RootDataShape>>(sliceKeys: K) {
