@@ -6,21 +6,17 @@ import {
   UpdateOption,
   ItemKeys,
   UpdateNotifier,
+  SubscriberRecords,
+  PriorityUpdateQueue,
 } from './type.js';
 
 export function createStore<RootDataShape>(
   initial?: Partial<RootDataShape>
 ): Store<RootDataShape> {
   let _rootState = initial ?? null;
-  const subscribeRecord = new Map<
-    keyof RootDataShape,
-    SliceDataSubscriberStore<RootDataShape>
-  >();
-
-  const prioritySubscriberUpdateQueue = new Map<
-    SliceDataSubscriber<RootDataShape>,
-    UpdateOption<RootDataShape, true>
-  >();
+  let subscribeRecords: SubscriberRecords<RootDataShape> = new Map();
+  let prioritySubscriberUpdateQueue: PriorityUpdateQueue<RootDataShape> =
+    new Map();
 
   function createUpdateListener<Slices extends ItemKeys<RootDataShape>>(
     slices: ItemKeys<RootDataShape>,
@@ -74,15 +70,31 @@ export function createStore<RootDataShape>(
     };
   }
 
+  function registerListener(
+    slices: ItemKeys<RootDataShape>,
+    listener: SliceDataSubscriber<RootDataShape>,
+    priorityQueue: PriorityUpdateQueue<RootDataShape>
+  ) {
+    const subscriberOption = createUpdateListener(slices, listener, true);
+    priorityQueue = new Map(priorityQueue);
+    priorityQueue.set(listener, subscriberOption);
+
+    const { notifyListener, ...options } = subscriberOption;
+    return [options, priorityQueue] as const;
+  }
+
   function subscriber(
     slices: ItemKeys<RootDataShape>,
     listener: SliceDataSubscriber<RootDataShape>
   ) {
-    const subscriberOption = createUpdateListener(slices, listener, true);
-    prioritySubscriberUpdateQueue.set(listener, subscriberOption);
+    const [updateOption, newPriorityQueue] = registerListener(
+      slices,
+      listener,
+      prioritySubscriberUpdateQueue
+    );
 
-    const { notifyListener, ...options } = subscriberOption;
-    return options;
+    prioritySubscriberUpdateQueue = newPriorityQueue;
+    return updateOption;
   }
 
   function applyUpdateToRootLevel(updates: Partial<RootDataShape>) {
@@ -90,17 +102,29 @@ export function createStore<RootDataShape>(
     prepUpdateForDispatch(Object.keys(updates) as ItemKeys<RootDataShape>);
   }
 
-  function prepUpdateForDispatch(changed: ItemKeys<RootDataShape>) {
-    const readyUpdateSubscribers = assembleSubscribersForUpdate(
-      changed,
-      subscribeRecord
+  function getListenerUpdater(
+    changes: ItemKeys<RootDataShape>,
+    subscriberRecords: SubscriberRecords<RootDataShape>,
+    priorityQueue: PriorityUpdateQueue<RootDataShape>
+  ) {
+    return getUpdatesOption(
+      assembleSubscribersForUpdate(changes, subscriberRecords),
+      priorityQueue
     );
-    return storeUpdateNotifier(getUpdatesOption(readyUpdateSubscribers));
+  }
+
+  function prepUpdateForDispatch(changed: ItemKeys<RootDataShape>) {
+    const updateListeners = getListenerUpdater(
+      changed,
+      subscribeRecords,
+      prioritySubscriberUpdateQueue
+    );
+    return void storeUpdateNotifier(updateListeners);
   }
 
   function assembleSubscribersForUpdate(
     changes: ItemKeys<RootDataShape>,
-    subscriberRecords: typeof subscribeRecord
+    subscriberRecords: typeof subscribeRecords
   ) {
     function retriveSubscriberRecord(change: typeof changes[number]) {
       return Array.from(subscriberRecords.get(change) ?? []);
@@ -109,10 +133,11 @@ export function createStore<RootDataShape>(
   }
 
   function getUpdatesOption(
-    updateSubscriber: Set<SliceDataSubscriber<RootDataShape>>
+    updateSubscriber: Set<SliceDataSubscriber<RootDataShape>>,
+    priorityQueue: PriorityUpdateQueue<RootDataShape>
   ) {
     const options = new Set<UpdateOption<RootDataShape>>();
-    prioritySubscriberUpdateQueue.forEach((option, subscriber) => {
+    priorityQueue.forEach((option, subscriber) => {
       if (updateSubscriber.has(subscriber)) options.add(option);
     });
     return options;
@@ -148,9 +173,9 @@ export function createStore<RootDataShape>(
   function initUpdateEntry(keys: ItemKeys<RootDataShape>) {
     function listenerEntry(key: keyof RootDataShape) {
       let listeners: SliceDataSubscriberStore<RootDataShape> =
-        subscribeRecord.has(key) ? subscribeRecord.get(key)! : new Set();
+        subscribeRecords.has(key) ? subscribeRecords.get(key)! : new Set();
 
-      subscribeRecord.set(key, listeners);
+      subscribeRecords.set(key, listeners);
       return [key, listeners] as const;
     }
     return new Map(keys.map(listenerEntry));

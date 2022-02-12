@@ -30,3 +30,13 @@ interface VisibelNotifier {
 export type ItemKeys<State> = Array<keyof State>;
 
 export type UpdateNotifier = () => void;
+
+export type SubscriberRecords<Root> = Map<
+  keyof Root,
+  SliceDataSubscriberStore<Root>
+>;
+
+export type PriorityUpdateQueue<Root> = Map<
+  SliceDataSubscriber<Root>,
+  UpdateOption<Root, true>
+>;
