@@ -28,3 +28,5 @@ interface VisibelNotifier {
 }
 
 export type ItemKeys<State> = Array<keyof State>;
+
+export type UpdateNotifier = () => void;

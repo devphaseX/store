@@ -49,16 +49,18 @@ export function createStore(initial) {
     }
     function applyUpdateToRootLevel(updates) {
         _rootState = immutableShallowMergeState(_rootState, updates);
-        if (_rootState) {
-            prepUpdateForDispatch(Object.keys(updates));
-        }
+        prepUpdateForDispatch(Object.keys(updates));
     }
     function prepUpdateForDispatch(changed) {
-        const readyUpdateSubscribers = assembleSubscribersForUpdate(changed);
+        const readyUpdateSubscribers = assembleSubscribersForUpdate(changed, subscribeRecord);
         return storeUpdateNotifier(getUpdatesOption(readyUpdateSubscribers));
     }
-    function assembleSubscribersForUpdate(changes) {
-        return new Set(changes.flatMap((change) => { var _a; return Array.from((_a = subscribeRecord.get(change)) !== null && _a !== void 0 ? _a : []); }));
+    function assembleSubscribersForUpdate(changes, subscriberRecords) {
+        function retriveSubscriberRecord(change) {
+            var _a;
+            return Array.from((_a = subscriberRecords.get(change)) !== null && _a !== void 0 ? _a : []);
+        }
+        return new Set(changes.flatMap(retriveSubscriberRecord));
     }
     function getUpdatesOption(updateSubscriber) {
         const options = new Set();

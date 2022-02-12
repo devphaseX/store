@@ -5,6 +5,7 @@ import {
   Store,
   UpdateOption,
   ItemKeys,
+  UpdateNotifier,
 } from './type.js';
 
 export function createStore<RootDataShape>(
@@ -86,21 +87,25 @@ export function createStore<RootDataShape>(
 
   function applyUpdateToRootLevel(updates: Partial<RootDataShape>) {
     _rootState = immutableShallowMergeState(_rootState, updates);
-
-    if (_rootState) {
-      prepUpdateForDispatch(Object.keys(updates) as ItemKeys<RootDataShape>);
-    }
+    prepUpdateForDispatch(Object.keys(updates) as ItemKeys<RootDataShape>);
   }
 
   function prepUpdateForDispatch(changed: ItemKeys<RootDataShape>) {
-    const readyUpdateSubscribers = assembleSubscribersForUpdate(changed);
+    const readyUpdateSubscribers = assembleSubscribersForUpdate(
+      changed,
+      subscribeRecord
+    );
     return storeUpdateNotifier(getUpdatesOption(readyUpdateSubscribers));
   }
 
-  function assembleSubscribersForUpdate(changes: ItemKeys<RootDataShape>) {
-    return new Set(
-      changes.flatMap((change) => Array.from(subscribeRecord.get(change) ?? []))
-    );
+  function assembleSubscribersForUpdate(
+    changes: ItemKeys<RootDataShape>,
+    subscriberRecords: typeof subscribeRecord
+  ) {
+    function retriveSubscriberRecord(change: typeof changes[number]) {
+      return Array.from(subscriberRecords.get(change) ?? []);
+    }
+    return new Set(changes.flatMap(retriveSubscriberRecord));
   }
 
   function getUpdatesOption(
@@ -113,7 +118,9 @@ export function createStore<RootDataShape>(
     return options;
   }
 
-  function storeUpdateNotifier(notices: Set<UpdateOption<RootDataShape>>) {
+  function storeUpdateNotifier<
+    NoticeObject extends { notifyListener: UpdateNotifier }
+  >(notices: Set<NoticeObject>) {
     notices.forEach((notice) => {
       notice.notifyListener();
     });
