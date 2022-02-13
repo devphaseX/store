@@ -19,3 +19,11 @@ export function take<State, Keys extends Array<keyof State>>(
     keys.map((key) => [key, state[key]] as const)
   ) as Pick<State, Keys[number]>;
 }
+
+export function deleteObjectProp<
+  O extends Record<PropertyKey, any>,
+  K extends keyof O
+>(obj: O, key: K): Omit<O, K> {
+  const { [key]: _, ...remain } = obj;
+  return remain;
+}

@@ -1,6 +1,9 @@
-import { immutableShallowMergeState, take } from './util/index.js';
 import {
-  SliceDataSubscriberStore,
+  deleteObjectProp,
+  immutableShallowMergeState,
+  take,
+} from './util/index.js';
+import {
   SliceDataSubscriber,
   Store,
   UpdateOption,
@@ -9,6 +12,8 @@ import {
   SubscriberRecords,
   PriorityUpdateQueue,
   GetArrayItem,
+  NotifyEntry,
+  ListenerEntry,
 } from './type.js';
 
 export function createStore<RootDataShape>(
@@ -75,13 +80,15 @@ export function createStore<RootDataShape>(
     slices: ItemKeys<RootDataShape>,
     listener: SliceDataSubscriber<RootDataShape>,
     priorityQueue: PriorityUpdateQueue<RootDataShape>
-  ) {
+  ): NotifyEntry<RootDataShape> {
     const subscriberOption = createUpdateListener(slices, listener, true);
     priorityQueue = new Map(priorityQueue);
     priorityQueue.set(listener, subscriberOption);
 
-    const { notifyListener, ...options } = subscriberOption;
-    return [options, priorityQueue] as const;
+    return [
+      deleteObjectProp(subscriberOption, 'notifyListener'),
+      priorityQueue,
+    ];
   }
 
   function subscriber(
@@ -138,8 +145,9 @@ export function createStore<RootDataShape>(
     priorityQueue: PriorityUpdateQueue<RootDataShape>
   ) {
     const options = new Set<UpdateOption<RootDataShape>>();
-    priorityQueue.forEach((option, subscriber) => {
-      if (updateSubscriber.has(subscriber)) options.add(option);
+    updateSubscriber.forEach((subscriber) => {
+      const updateOption = priorityQueue.get(subscriber)!;
+      options.add(updateOption);
     });
     return options;
   }
@@ -176,10 +184,12 @@ export function createStore<RootDataShape>(
   }
 
   function initUpdateEntry(keys: ItemKeys<RootDataShape>) {
-    function listenerEntry(key: GetArrayItem<typeof keys>) {
+    function listenerEntry(
+      key: GetArrayItem<typeof keys>
+    ): ListenerEntry<RootDataShape> {
       let listeners = subscribeRecords.get(key) ?? new Set();
       subscribeRecords.set(key, listeners);
-      return [key, listeners] as const;
+      return [key, listeners];
     }
     return new Map(keys.map(listenerEntry));
   }

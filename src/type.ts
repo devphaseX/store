@@ -42,3 +42,9 @@ export type PriorityUpdateQueue<Root> = Map<
 >;
 
 export type GetArrayItem<List> = List extends Array<infer T> ? T : never;
+export type NotifyEntry<Root> = [
+  UpdateOption<Root, false>,
+  PriorityUpdateQueue<Root>
+];
+
+export type ListenerEntry<Root> = [keyof Root, SliceDataSubscriberStore<Root>];
