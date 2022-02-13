@@ -8,13 +8,14 @@ import {
   UpdateNotifier,
   SubscriberRecords,
   PriorityUpdateQueue,
+  GetArrayItem,
 } from './type.js';
 
 export function createStore<RootDataShape>(
   initial?: Partial<RootDataShape>
 ): Store<RootDataShape> {
   let _rootState = initial ?? null;
-  let subscribeRecords: SubscriberRecords<RootDataShape> = new Map();
+  const subscribeRecords: SubscriberRecords<RootDataShape> = new Map();
   let prioritySubscriberUpdateQueue: PriorityUpdateQueue<RootDataShape> =
     new Map();
 
@@ -153,28 +154,30 @@ export function createStore<RootDataShape>(
 
   function subscribeListener(
     listener: SliceDataSubscriber<RootDataShape>,
-    stores: ReturnType<typeof initUpdateEntry>,
+    stores: SubscriberRecords<RootDataShape>,
     sliceKeys: Set<keyof RootDataShape>
   ) {
-    stores.forEach((listenerStore) => {
-      listenerStore.add(listener);
-    });
+    subscribeToRootLevelData();
+    function subscribeToRootLevelData() {
+      sliceKeys.forEach((key) => {
+        stores.get(key)!.add(listener);
+      });
+    }
 
-    return function detach(parts: ItemKeys<RootDataShape>) {
-      parts.forEach((part) => {
+    function revokeRootDataSub(parts: ItemKeys<RootDataShape>) {
+      parts.forEach(function revoke(part) {
         if (stores.has(part)) {
           stores.get(part)!.delete(listener);
           sliceKeys.delete(part);
         }
       });
-    };
+    }
+    return revokeRootDataSub;
   }
 
   function initUpdateEntry(keys: ItemKeys<RootDataShape>) {
-    function listenerEntry(key: keyof RootDataShape) {
-      let listeners: SliceDataSubscriberStore<RootDataShape> =
-        subscribeRecords.has(key) ? subscribeRecords.get(key)! : new Set();
-
+    function listenerEntry(key: GetArrayItem<typeof keys>) {
+      let listeners = subscribeRecords.get(key) ?? new Set();
       subscribeRecords.set(key, listeners);
       return [key, listeners] as const;
     }

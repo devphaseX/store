@@ -40,3 +40,5 @@ export type PriorityUpdateQueue<Root> = Map<
   SliceDataSubscriber<Root>,
   UpdateOption<Root, true>
 >;
+
+export type GetArrayItem<List> = List extends Array<infer T> ? T : never;
