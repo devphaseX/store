@@ -18,6 +18,7 @@ export interface SliceDataSubscriber<State> {
 export type SliceDataSubscriberStore<Root> = Set<SliceDataSubscriber<Root>>;
 
 export type UpdateOption<State, Notifier extends boolean = true> = {
+  unsubscriber(part: keyof State): void;
   unsubscriber(slices: Array<keyof State>): void;
   setSlicePart(parts: Partial<State>): void;
   getSlicePart(): Partial<State> | null;

@@ -27,3 +27,32 @@ export function deleteObjectProp<
   const { [key]: _, ...remain } = obj;
   return remain;
 }
+
+export function createDataKey<T>(
+  slices: Array<T>,
+  dataRevoker: (key: T) => void
+) {
+  const dataKeys = new Set(slices);
+
+  function unsubscriber(key: T): void;
+  function unsubscriber(keys: typeof slices): void;
+  function unsubscriber(type: T | typeof slices) {
+    if (!Array.isArray(type)) {
+      if (dataKeys.has(type)) {
+        dataKeys.delete(type);
+        dataRevoker(type);
+      }
+      return void 0;
+    }
+    return type.forEach(unsubscriber);
+  }
+
+  function getDataKeys() {
+    return Array.from(dataKeys);
+  }
+
+  return {
+    unsubscriber,
+    getDataKeys,
+  };
+}

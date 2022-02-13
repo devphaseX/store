@@ -1,4 +1,5 @@
 import {
+  createDataKey,
   deleteObjectProp,
   immutableShallowMergeState,
   take,
@@ -44,16 +45,34 @@ export function createStore<RootDataShape>(
     listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>,
     showNotifier = true
   ): UpdateOption<RootDataShape, typeof showNotifier> {
-    const dataKeys = new Set(slices);
-    const updateEntries = initUpdateEntry(slices);
-    const unsubscriber = subscribeListener(listener, updateEntries, dataKeys);
+    const accessRevoker = makeAccessRevokable(
+      initUpdateEntry(slices),
+      listener,
+      slices
+    );
+
+    const { getDataKeys, unsubscriber } = createDataKey(slices, accessRevoker);
+
+    function makeAccessRevokable(
+      records: SubscriberRecords<RootDataShape>,
+      listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>,
+      slices: ItemKeys<RootDataShape>
+    ) {
+      slices.forEach((slice) => {
+        records.get(slice)?.add(listener);
+      });
+
+      return function (key: GetArrayItem<typeof slices>) {
+        records.get(key)!.delete(listener);
+      };
+    }
 
     function setSlicePart(slicePart: Pick<RootDataShape, typeof slices[0]>) {
-      applyUpdateToRootLevel(take(slicePart, Array.from(slices)));
+      applyUpdateToRootLevel(take(slicePart, getDataKeys()));
     }
 
     const getSlicePart = function () {
-      return sliceState(Array.from(dataKeys));
+      return sliceState(getDataKeys());
     };
 
     function notifyListener() {
@@ -144,46 +163,23 @@ export function createStore<RootDataShape>(
     updateSubscriber: Set<SliceDataSubscriber<RootDataShape>>,
     priorityQueue: PriorityUpdateQueue<RootDataShape>
   ) {
-    const options = new Set<UpdateOption<RootDataShape>>();
-    updateSubscriber.forEach((subscriber) => {
-      const updateOption = priorityQueue.get(subscriber)!;
-      options.add(updateOption);
-    });
-    return options;
+    return Array.from(
+      updateSubscriber,
+      (subscriber) => priorityQueue.get(subscriber)!
+    );
   }
 
   function storeUpdateNotifier<
     NoticeObject extends { notifyListener: UpdateNotifier }
-  >(notices: Set<NoticeObject>) {
+  >(notices: Array<NoticeObject>) {
     notices.forEach((notice) => {
       notice.notifyListener();
     });
   }
 
-  function subscribeListener(
-    listener: SliceDataSubscriber<RootDataShape>,
-    stores: SubscriberRecords<RootDataShape>,
-    sliceKeys: Set<keyof RootDataShape>
-  ) {
-    subscribeToRootLevelData();
-    function subscribeToRootLevelData() {
-      sliceKeys.forEach((key) => {
-        stores.get(key)!.add(listener);
-      });
-    }
-
-    function revokeRootDataSub(parts: ItemKeys<RootDataShape>) {
-      parts.forEach(function revoke(part) {
-        if (stores.has(part)) {
-          stores.get(part)!.delete(listener);
-          sliceKeys.delete(part);
-        }
-      });
-    }
-    return revokeRootDataSub;
-  }
-
-  function initUpdateEntry(keys: ItemKeys<RootDataShape>) {
+  function initUpdateEntry(
+    keys: ItemKeys<RootDataShape>
+  ): SubscriberRecords<RootDataShape> {
     function listenerEntry(
       key: GetArrayItem<typeof keys>
     ): ListenerEntry<RootDataShape> {
