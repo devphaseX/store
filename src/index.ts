@@ -3,6 +3,7 @@ import {
   deleteObjectProp,
   immutableShallowMergeState,
   take,
+  validateObjectState,
 } from './util/index.js';
 import {
   SliceDataSubscriber,
@@ -17,10 +18,29 @@ import {
   ListenerEntry,
 } from './type.js';
 
+function validateNewStoreState(state: any, message: string) {
+  if (state === null) return state;
+  if (!validateObjectState(state ?? {})) {
+    throw TypeError(message);
+  }
+  return state;
+}
+
+function createInvalidInitialErrorMsg(type: any) {
+  return `Expected the initial global state type {Object} but got ${typeof type}`;
+}
+
+function createInvalidUpdateErrorMsg(type: any) {
+  return `Expected the newly state update {Object} but got ${typeof type}`;
+}
+
 export function createStore<RootDataShape>(
   initial?: Partial<RootDataShape>
 ): Store<RootDataShape> {
-  let _rootState = initial ?? null;
+  let _rootState = validateNewStoreState(
+    initial ?? null,
+    createInvalidInitialErrorMsg(initial)
+  );
   const subscribeRecords: SubscriberRecords<RootDataShape> = new Map();
   let prioritySubscriberUpdateQueue: PriorityUpdateQueue<RootDataShape> =
     new Map();
@@ -58,16 +78,22 @@ export function createStore<RootDataShape>(
       listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>,
       slices: ItemKeys<RootDataShape>
     ) {
-      slices.forEach((slice) => {
+      slices.forEach(function addListenerToRecord(slice) {
         records.get(slice)?.add(listener);
       });
 
-      return function (key: GetArrayItem<typeof slices>) {
+      return function deleteListenerFromRecord(
+        key: GetArrayItem<typeof slices>
+      ) {
         records.get(key)!.delete(listener);
       };
     }
 
     function setSlicePart(slicePart: Pick<RootDataShape, typeof slices[0]>) {
+      slicePart = validateNewStoreState(
+        setSlicePart,
+        createInvalidUpdateErrorMsg(slicePart)
+      );
       applyUpdateToRootLevel(take(slicePart, getDataKeys()));
     }
 

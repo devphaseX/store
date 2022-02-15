@@ -13,11 +13,11 @@ export function immutableShallowMergeState<State>(
 export function take<State, Keys extends Array<keyof State>>(
   state: State,
   keys: Keys
-) {
+): Pick<State, Keys[number]> {
   keys = keys.filter((key) => key in state) as Keys;
   return Object.fromEntries(
     keys.map((key) => [key, state[key]] as const)
-  ) as Pick<State, Keys[number]>;
+  ) as any;
 }
 
 export function deleteObjectProp<
@@ -55,4 +55,15 @@ export function createDataKey<T>(
     unsubscriber,
     getDataKeys,
   };
+}
+
+export function validateObjectState(value: any) {
+  return !isPlainObject(value);
+}
+
+function isPlainObject(value: any) {
+  return (
+    Object.prototype.toString.call(value) === '[object Object]' &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
 }

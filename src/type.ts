@@ -49,3 +49,4 @@ export type NotifyEntry<Root> = [
 ];
 
 export type ListenerEntry<Root> = [keyof Root, SliceDataSubscriberStore<Root>];
+export type NestedDataSlice<State, K extends keyof State> = Pick<State, K>;
