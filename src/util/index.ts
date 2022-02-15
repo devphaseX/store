@@ -31,7 +31,7 @@ export function deleteObjectProp<
 }
 
 export function createDataKey<State>(accessRevoker: RevokeAccess<State>) {
-  const dataKeys = new Set(accessRevoker[0]);
+  const [dataKeys, revoker] = accessRevoker;
 
   type RevokeKey = GetRevokerAccessKey<typeof accessRevoker>;
 
@@ -41,7 +41,7 @@ export function createDataKey<State>(accessRevoker: RevokeAccess<State>) {
     if (!Array.isArray(type)) {
       if (dataKeys.has(type)) {
         dataKeys.delete(type);
-        accessRevoker[1](type);
+        revoker(type);
       }
       return void 0;
     }
