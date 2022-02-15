@@ -1,6 +1,7 @@
 import {
   createDataKey,
   deepClone,
+  deepEqual,
   deleteObjectProp,
   immutableShallowMergeState,
   isFunction,
@@ -20,6 +21,7 @@ import {
   ListenerEntry,
   CreateStateFromPreviousFn,
   RevokeAccess,
+  NestedDataSlice,
 } from './type.js';
 
 function validateNewStoreState(state: any, message: string) {
@@ -54,6 +56,9 @@ export function createStore<RootDataShape>(
     listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>
   ): UpdateOption<RootDataShape> {
     type DataKeys = Slices[number];
+    let previousState: NestedDataSlice<RootDataShape, DataKeys> | null =
+      deepClone(getSlicePart());
+
     const accessRevoker = makeAccessRevokable(
       initUpdateEntry(slices),
       listener,
@@ -92,7 +97,7 @@ export function createStore<RootDataShape>(
       let newState!: Partial<SliceRootState>;
 
       if (isFunction(slicePart)) {
-        newState = deepClone(slicePart(getSlicePart() ?? {}));
+        newState = deepClone(slicePart(previousState ?? {}));
       } else {
         newState = slicePart;
       }
@@ -103,12 +108,21 @@ export function createStore<RootDataShape>(
       applyUpdateToRootLevel(take(newState, getDataKeys()));
     }
 
-    const getSlicePart = function () {
-      return sliceState(getDataKeys());
-    };
+    function getSlicePart() {
+      return deepClone(sliceState(getDataKeys()));
+    }
 
     function notifyListener() {
-      listener(getSlicePart() as any);
+      const currentState = getSlicePart();
+      const isNewStateDifferenceFromPrevious =
+        previousState &&
+        currentState &&
+        !deepEqual(previousState, currentState);
+
+      if (isNewStateDifferenceFromPrevious) {
+        previousState = currentState;
+        listener(currentState);
+      }
     }
 
     return {

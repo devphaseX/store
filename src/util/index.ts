@@ -76,23 +76,48 @@ function isObject(value: any) {
 export const isFunction = (value: any): value is Function =>
   typeof value === 'function';
 
-export function deepClone(
-  value: any,
+export function deepClone<State>(
+  value: State,
   typeUnwrapper?: (value: any) => any
-): any {
+): State {
   if (!isPlainObject(value) && !typeUnwrapper) return value;
 
   if (Array.isArray(value)) {
-    return value.map((item) => deepClone(item, typeUnwrapper));
+    return value.map((item) =>
+      deepClone(item, typeUnwrapper)
+    ) as unknown as State;
   }
 
-  const newObj = {} as any;
-  Object.keys(value).forEach((key) => {
+  const newObj = {} as State;
+  (Object.keys(value) as Array<keyof State>).forEach((key) => {
     newObj[key] = deepClone(value[key], typeUnwrapper);
   });
 
   return newObj;
 }
 
-console.log(deepClone([{ a: { b: 'c' } }, 1, true, new Set([1, 2, 3, 4])]));
-console.log(isPlainObject({}));
+export function deepEqual<State>(
+  prevState: Partial<State> | null,
+  newState: Partial<State> | null
+): boolean {
+  if (prevState === null || newState === null) return true;
+  if (
+    !(isObject(prevState) || isObject(newState)) ||
+    isFunction(prevState) ||
+    !isPlainObject(prevState)
+  )
+    return Object.is(prevState, newState);
+
+  if (Array.isArray(prevState) && Array.isArray(newState)) {
+    if (prevState.length !== newState.length) return false;
+    return prevState.every((item, i) => deepEqual(item, newState[i]));
+  }
+
+  const prevObjKeys = Object.keys(prevState) as Array<keyof State>;
+
+  if (prevObjKeys !== Object.keys(newState)) return false;
+
+  return prevObjKeys.every((key) =>
+    deepEqual(prevState[key] ?? null, newState[key] ?? null)
+  );
+}
