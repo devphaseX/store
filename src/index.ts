@@ -1,5 +1,6 @@
 import {
   createDataKey,
+  deepClone,
   deleteObjectProp,
   immutableShallowMergeState,
   isFunction,
@@ -18,6 +19,7 @@ import {
   NotifyEntry,
   ListenerEntry,
   CreateStateFromPreviousFn,
+  RevokeAccess,
 } from './type.js';
 
 function validateNewStoreState(state: any, message: string) {
@@ -49,66 +51,50 @@ export function createStore<RootDataShape>(
 
   function createUpdateListener<Slices extends ItemKeys<RootDataShape>>(
     slices: ItemKeys<RootDataShape>,
-    listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>,
-    showNotifier: true
-  ): UpdateOption<RootDataShape, true>;
-  function createUpdateListener<Slices extends ItemKeys<RootDataShape>>(
-    slices: ItemKeys<RootDataShape>,
-    listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>,
-    showNotifier: false
-  ): UpdateOption<RootDataShape, false>;
-  function createUpdateListener<Slices extends ItemKeys<RootDataShape>>(
-    slices: ItemKeys<RootDataShape>,
-    listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>,
-    showNotifier: boolean
-  ): UpdateOption<RootDataShape, boolean>;
-  function createUpdateListener<Slices extends ItemKeys<RootDataShape>>(
-    slices: ItemKeys<RootDataShape>,
-    listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>,
-    showNotifier = true
-  ): UpdateOption<RootDataShape, typeof showNotifier> {
+    listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>
+  ): UpdateOption<RootDataShape> {
+    type DataKeys = Slices[number];
     const accessRevoker = makeAccessRevokable(
       initUpdateEntry(slices),
       listener,
       slices
     );
 
-    const { getDataKeys, unsubscriber } = createDataKey(slices, accessRevoker);
+    const { getDataKeys, unsubscriber } = createDataKey(accessRevoker);
 
     function makeAccessRevokable(
       records: SubscriberRecords<RootDataShape>,
-      listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>,
+      listener: SliceDataSubscriber<Pick<RootDataShape, DataKeys>>,
       slices: ItemKeys<RootDataShape>
-    ) {
+    ): RevokeAccess<RootDataShape> {
       slices.forEach(function addListenerToRecord(slice) {
         records.get(slice)?.add(listener);
       });
 
-      return function deleteListenerFromRecord(
-        key: GetArrayItem<typeof slices>
-      ) {
+      function deleteListenerFromRecord(key: GetArrayItem<typeof slices>) {
         records.get(key)!.delete(listener);
-      };
+      }
+
+      return [new Set(slices), deleteListenerFromRecord];
     }
 
-    type SliceRootState<Slices extends keyof RootDataShape> = Pick<
-      RootDataShape,
-      Slices
-    >;
+    type SliceRootState = Pick<RootDataShape, DataKeys>;
 
     type MappableSlicePart =
-      | SliceRootState<Slices[number]>
-      | CreateStateFromPreviousFn<SliceRootState<Slices[number]>>;
+      | SliceRootState
+      | CreateStateFromPreviousFn<SliceRootState>;
 
-    function setSlicePart(slicePart: SliceRootState<Slices[number]>): void;
+    function setSlicePart(slicePart: SliceRootState): void;
     function setSlicePart(
-      slicePastFn: CreateStateFromPreviousFn<SliceRootState<Slices[number]>>
+      slicePastFn: CreateStateFromPreviousFn<SliceRootState>
     ): void;
     function setSlicePart(slicePart: MappableSlicePart) {
-      let newState!: Partial<SliceRootState<Slices[number]>>;
+      let newState!: Partial<SliceRootState>;
 
       if (isFunction(slicePart)) {
-        newState = slicePart(getSlicePart() ?? {});
+        newState = deepClone(slicePart(getSlicePart() ?? {}));
+      } else {
+        newState = slicePart;
       }
       slicePart = validateNewStoreState(
         newState,
@@ -125,14 +111,6 @@ export function createStore<RootDataShape>(
       listener(getSlicePart() as any);
     }
 
-    if (!showNotifier) {
-      return {
-        unsubscriber,
-        setSlicePart,
-        getSlicePart,
-      };
-    }
-
     return {
       unsubscriber,
       setSlicePart,
@@ -146,7 +124,7 @@ export function createStore<RootDataShape>(
     listener: SliceDataSubscriber<RootDataShape>,
     priorityQueue: PriorityUpdateQueue<RootDataShape>
   ): NotifyEntry<RootDataShape> {
-    const subscriberOption = createUpdateListener(slices, listener, true);
+    const subscriberOption = createUpdateListener(slices, listener);
     priorityQueue = new Map(priorityQueue);
     priorityQueue.set(listener, subscriberOption);
 

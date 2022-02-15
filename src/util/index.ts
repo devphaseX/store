@@ -1,3 +1,5 @@
+import { GetRevokerAccessKey, RevokeAccess } from '../type';
+
 export function getFreeVariable<T>(closeOverFn: () => T) {
   return function unwrapCloseOver() {
     return closeOverFn();
@@ -28,19 +30,18 @@ export function deleteObjectProp<
   return remain;
 }
 
-export function createDataKey<T>(
-  slices: Array<T>,
-  dataRevoker: (key: T) => void
-) {
-  const dataKeys = new Set(slices);
+export function createDataKey<State>(accessRevoker: RevokeAccess<State>) {
+  const dataKeys = new Set(accessRevoker[0]);
 
-  function unsubscriber(key: T): void;
-  function unsubscriber(keys: typeof slices): void;
-  function unsubscriber(type: T | typeof slices) {
+  type RevokeKey = GetRevokerAccessKey<typeof accessRevoker>;
+
+  function unsubscriber(key: RevokeKey): void;
+  function unsubscriber(keys: Array<RevokeKey>): void;
+  function unsubscriber(type: RevokeKey | Array<RevokeKey>) {
     if (!Array.isArray(type)) {
       if (dataKeys.has(type)) {
         dataKeys.delete(type);
-        dataRevoker(type);
+        accessRevoker[1](type);
       }
       return void 0;
     }
@@ -75,7 +76,10 @@ function isObject(value: any) {
 export const isFunction = (value: any): value is Function =>
   typeof value === 'function';
 
-function deepClone(value: any, typeUnwrapper?: (value: any) => any): any {
+export function deepClone(
+  value: any,
+  typeUnwrapper?: (value: any) => any
+): any {
   if (!isPlainObject(value) && !typeUnwrapper) return value;
 
   if (Array.isArray(value)) {

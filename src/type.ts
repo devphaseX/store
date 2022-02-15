@@ -2,7 +2,7 @@ export interface Store<Root> {
   subscriber<Slices extends Array<keyof Root>>(
     slice: Slices,
     dataUpdateListener: SliceDataSubscriber<Pick<Root, Slices[number]>>
-  ): UpdateOption<Pick<Root, Slices[number]>, false>;
+  ): Omit<UpdateOption<Pick<Root, Slices[number]>>, 'notifyListener'>;
 
   getRootLevelState(): Partial<Root> | null;
   setRootLevelState(state: Partial<Root>): void;
@@ -17,7 +17,7 @@ export interface SliceDataSubscriber<State> {
 
 export type SliceDataSubscriberStore<Root> = Set<SliceDataSubscriber<Root>>;
 
-export type UpdateOption<State, Notifier extends boolean = true> = {
+export type UpdateOption<State> = {
   unsubscriber(part: keyof State): void;
   unsubscriber(slices: Array<keyof State>): void;
   setSlicePart(parts: Partial<State>): void;
@@ -27,11 +27,8 @@ export type UpdateOption<State, Notifier extends boolean = true> = {
       | ((currentState: Partial<State>) => Partial<State>)
   ): void;
   getSlicePart(): Partial<State> | null;
-} & (Notifier extends true ? VisibelNotifier : {});
-
-interface VisibelNotifier {
   notifyListener(): void;
-}
+};
 
 export type ItemKeys<State> = Array<keyof State>;
 
@@ -44,12 +41,12 @@ export type SubscriberRecords<Root> = Map<
 
 export type PriorityUpdateQueue<Root> = Map<
   SliceDataSubscriber<Root>,
-  UpdateOption<Root, true>
+  UpdateOption<Root>
 >;
 
 export type GetArrayItem<List> = List extends Array<infer T> ? T : never;
 export type NotifyEntry<Root> = [
-  UpdateOption<Root, false>,
+  Omit<UpdateOption<Root>, 'notifyListener'>,
   PriorityUpdateQueue<Root>
 ];
 
@@ -58,3 +55,14 @@ export type NestedDataSlice<State, K extends keyof State> = Pick<State, K>;
 export interface CreateStateFromPreviousFn<State> {
   (currentState: Partial<State>): Partial<State>;
 }
+
+export type RevokeAccess<State> = [
+  dataKeys: Set<keyof State>,
+  revoker: (key: keyof State) => void
+];
+
+export type GetRevokerAccessKey<Revoker> = Revoker extends RevokeAccess<
+  infer State
+>
+  ? keyof State
+  : never;
