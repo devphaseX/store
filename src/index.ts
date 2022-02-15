@@ -21,7 +21,7 @@ import {
 } from './type.js';
 
 function validateNewStoreState(state: any, message: string) {
-  if (state === null) return state;
+  if (state == null) return state;
   if (!validateObjectState(state ?? {})) {
     throw TypeError(message);
   }
@@ -111,7 +111,7 @@ export function createStore<RootDataShape>(
         newState = slicePart(getSlicePart() ?? {});
       }
       slicePart = validateNewStoreState(
-        setSlicePart,
+        newState,
         createInvalidUpdateErrorMsg(slicePart)
       );
       applyUpdateToRootLevel(take(newState, getDataKeys()));

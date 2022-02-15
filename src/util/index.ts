@@ -14,7 +14,7 @@ export function take<State, Keys extends Array<keyof State>>(
   state: State,
   keys: Keys
 ): Pick<State, Keys[number]> {
-  keys = keys.filter((key) => key in state) as Keys;
+  keys = keys.filter((key) => (isObject(state) ? key in state : false)) as Keys;
   return Object.fromEntries(
     keys.map((key) => [key, state[key]] as const)
   ) as any;
@@ -58,7 +58,7 @@ export function createDataKey<T>(
 }
 
 export function validateObjectState(value: any) {
-  return !isPlainObject(value);
+  return isPlainObject(value);
 }
 
 function isPlainObject(value: any) {
@@ -68,5 +68,27 @@ function isPlainObject(value: any) {
   );
 }
 
+function isObject(value: any) {
+  return value instanceof Object;
+}
+
 export const isFunction = (value: any): value is Function =>
   typeof value === 'function';
+
+function deepClone(value: any, typeUnwrapper?: (value: any) => any): any {
+  if (!isPlainObject(value) && !typeUnwrapper) return value;
+
+  if (Array.isArray(value)) {
+    return value.map((item) => deepClone(item, typeUnwrapper));
+  }
+
+  const newObj = {} as any;
+  Object.keys(value).forEach((key) => {
+    newObj[key] = deepClone(value[key], typeUnwrapper);
+  });
+
+  return newObj;
+}
+
+console.log(deepClone([{ a: { b: 'c' } }, 1, true, new Set([1, 2, 3, 4])]));
+console.log(isPlainObject({}));
