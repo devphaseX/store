@@ -2,6 +2,7 @@ import {
   createDataKey,
   deleteObjectProp,
   immutableShallowMergeState,
+  isFunction,
   take,
   validateObjectState,
 } from './util/index.js';
@@ -16,6 +17,7 @@ import {
   GetArrayItem,
   NotifyEntry,
   ListenerEntry,
+  CreateStateFromPreviousFn,
 } from './type.js';
 
 function validateNewStoreState(state: any, message: string) {
@@ -89,12 +91,30 @@ export function createStore<RootDataShape>(
       };
     }
 
-    function setSlicePart(slicePart: Pick<RootDataShape, typeof slices[0]>) {
+    type SliceRootState<Slices extends keyof RootDataShape> = Pick<
+      RootDataShape,
+      Slices
+    >;
+
+    type MappableSlicePart =
+      | SliceRootState<Slices[number]>
+      | CreateStateFromPreviousFn<SliceRootState<Slices[number]>>;
+
+    function setSlicePart(slicePart: SliceRootState<Slices[number]>): void;
+    function setSlicePart(
+      slicePastFn: CreateStateFromPreviousFn<SliceRootState<Slices[number]>>
+    ): void;
+    function setSlicePart(slicePart: MappableSlicePart) {
+      let newState!: Partial<SliceRootState<Slices[number]>>;
+
+      if (isFunction(slicePart)) {
+        newState = slicePart(getSlicePart() ?? {});
+      }
       slicePart = validateNewStoreState(
         setSlicePart,
         createInvalidUpdateErrorMsg(slicePart)
       );
-      applyUpdateToRootLevel(take(slicePart, getDataKeys()));
+      applyUpdateToRootLevel(take(newState, getDataKeys()));
     }
 
     const getSlicePart = function () {

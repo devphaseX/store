@@ -21,6 +21,11 @@ export type UpdateOption<State, Notifier extends boolean = true> = {
   unsubscriber(part: keyof State): void;
   unsubscriber(slices: Array<keyof State>): void;
   setSlicePart(parts: Partial<State>): void;
+  setSlicePart(
+    mappable:
+      | Partial<State>
+      | ((currentState: Partial<State>) => Partial<State>)
+  ): void;
   getSlicePart(): Partial<State> | null;
 } & (Notifier extends true ? VisibelNotifier : {});
 
@@ -50,3 +55,6 @@ export type NotifyEntry<Root> = [
 
 export type ListenerEntry<Root> = [keyof Root, SliceDataSubscriberStore<Root>];
 export type NestedDataSlice<State, K extends keyof State> = Pick<State, K>;
+export interface CreateStateFromPreviousFn<State> {
+  (currentState: Partial<State>): Partial<State>;
+}

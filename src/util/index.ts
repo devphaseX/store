@@ -67,3 +67,6 @@ function isPlainObject(value: any) {
     Object.getPrototypeOf(value) === Object.prototype
   );
 }
+
+export const isFunction = (value: any): value is Function =>
+  typeof value === 'function';
