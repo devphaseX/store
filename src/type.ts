@@ -1,7 +1,9 @@
+export type State = Record<PropertyKey, any>;
+
 export interface Store<Root> {
   subscriber<Slices extends Array<keyof Root>>(
     slice: Slices,
-    dataUpdateListener: SliceDataSubscriber<Pick<Root, Slices[number]>>
+    dataUpdateListener: SliceDataSubscriber<Partial<Pick<Root, Slices[number]>>>
   ): Omit<UpdateOption<Pick<Root, Slices[number]>>, 'notifyListener'>;
 
   getRootLevelState(): Partial<Root> | null;
@@ -51,7 +53,9 @@ export type NotifyEntry<Root> = [
 ];
 
 export type ListenerEntry<Root> = [keyof Root, SliceDataSubscriberStore<Root>];
-export type NestedDataSlice<State, K extends keyof State> = Pick<State, K>;
+export type NestedDataSlice<State, K extends keyof State> = Partial<
+  Pick<State, K>
+>;
 export interface CreateStateFromPreviousFn<State> {
   (currentState: Partial<State>): Partial<State>;
 }

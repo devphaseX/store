@@ -44,7 +44,7 @@ export function createStore<RootDataShape>(
   initial?: Partial<RootDataShape>
 ): Store<RootDataShape> {
   let _rootState = validateNewStoreState(
-    initial ?? null,
+    initial ?? {},
     createInvalidInitialErrorMsg(initial)
   );
   const subscribeRecords: SubscriberRecords<RootDataShape> = new Map();
@@ -53,11 +53,9 @@ export function createStore<RootDataShape>(
 
   function createUpdateListener<Slices extends ItemKeys<RootDataShape>>(
     slices: ItemKeys<RootDataShape>,
-    listener: SliceDataSubscriber<Pick<RootDataShape, Slices[number]>>
+    listener: SliceDataSubscriber<Partial<Pick<RootDataShape, Slices[number]>>>
   ): UpdateOption<RootDataShape> {
     type DataKeys = Slices[number];
-    let previousState: NestedDataSlice<RootDataShape, DataKeys> | null =
-      deepClone(getSlicePart());
 
     const accessRevoker = makeAccessRevokable(
       initUpdateEntry(slices),
@@ -66,10 +64,13 @@ export function createStore<RootDataShape>(
     );
 
     const { getDataKeys, unsubscriber } = createDataKey(accessRevoker);
+    let currentState: NestedDataSlice<RootDataShape, DataKeys> = deepClone(
+      getSlicePart()
+    );
 
     function makeAccessRevokable(
       records: SubscriberRecords<RootDataShape>,
-      listener: SliceDataSubscriber<Pick<RootDataShape, DataKeys>>,
+      listener: SliceDataSubscriber<Partial<Pick<RootDataShape, DataKeys>>>,
       slices: ItemKeys<RootDataShape>
     ): RevokeAccess<RootDataShape> {
       slices.forEach(function addListenerToRecord(slice) {
@@ -94,18 +95,26 @@ export function createStore<RootDataShape>(
       slicePastFn: CreateStateFromPreviousFn<SliceRootState>
     ): void;
     function setSlicePart(slicePart: MappableSlicePart) {
+      let previousState = currentState;
       let newState!: Partial<SliceRootState>;
 
       if (isFunction(slicePart)) {
-        newState = deepClone(slicePart(previousState ?? {}));
+        newState = deepClone(slicePart(currentState ?? {}));
       } else {
-        newState = slicePart;
+        newState = deepClone(slicePart);
       }
       slicePart = validateNewStoreState(
         newState,
         createInvalidUpdateErrorMsg(slicePart)
       );
-      applyUpdateToRootLevel(take(newState, getDataKeys()));
+
+      const updateChanges = Object.keys(newState) as Array<
+        keyof typeof previousState
+      >;
+      if (!deepEqual(take(previousState, updateChanges), currentState)) {
+        currentState = newState;
+        applyUpdateToRootLevel(take(newState, getDataKeys()));
+      }
     }
 
     function getSlicePart() {
@@ -113,16 +122,7 @@ export function createStore<RootDataShape>(
     }
 
     function notifyListener() {
-      const currentState = getSlicePart();
-      const isNewStateDifferenceFromPrevious =
-        previousState &&
-        currentState &&
-        !deepEqual(previousState, currentState);
-
-      if (isNewStateDifferenceFromPrevious) {
-        previousState = currentState;
-        listener(currentState);
-      }
+      listener(currentState);
     }
 
     return {
@@ -135,7 +135,7 @@ export function createStore<RootDataShape>(
 
   function createListenerEntry(
     slices: ItemKeys<RootDataShape>,
-    listener: SliceDataSubscriber<RootDataShape>,
+    listener: SliceDataSubscriber<Partial<RootDataShape>>,
     priorityQueue: PriorityUpdateQueue<RootDataShape>
   ): NotifyEntry<RootDataShape> {
     const subscriberOption = createUpdateListener(slices, listener);
@@ -150,7 +150,7 @@ export function createStore<RootDataShape>(
 
   function subscriber(
     slices: ItemKeys<RootDataShape>,
-    listener: SliceDataSubscriber<RootDataShape>
+    listener: SliceDataSubscriber<Partial<RootDataShape>>
   ) {
     const [updateOption, newPriorityQueue] = createListenerEntry(
       slices,
@@ -235,7 +235,9 @@ export function createStore<RootDataShape>(
   }
 
   function sliceState<K extends ItemKeys<RootDataShape>>(sliceKeys: K) {
-    return _rootState ? take(_rootState, sliceKeys) : null;
+    return _rootState
+      ? take(_rootState, sliceKeys)
+      : ({} as Pick<RootDataShape, K[number]>);
   }
 
   return {
