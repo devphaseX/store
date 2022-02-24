@@ -64,7 +64,7 @@ export function createStore<RootDataShape>(
     );
 
     const { getDataKeys, unsubscriber } = createDataKey(accessRevoker);
-    let currentState: NestedDataSlice<RootDataShape, DataKeys> = deepClone(
+    let previouState: NestedDataSlice<RootDataShape, DataKeys> = deepClone(
       getSlicePart()
     );
 
@@ -95,11 +95,11 @@ export function createStore<RootDataShape>(
       slicePastFn: CreateStateFromPreviousFn<SliceRootState>
     ): void;
     function setSlicePart(slicePart: MappableSlicePart) {
-      let previousState = currentState;
+      let previousState = previouState;
       let newState!: Partial<SliceRootState>;
 
       if (isFunction(slicePart)) {
-        newState = deepClone(slicePart(currentState ?? {}));
+        newState = deepClone(slicePart(previouState ?? {}));
       } else {
         newState = deepClone(slicePart);
       }
@@ -111,8 +111,7 @@ export function createStore<RootDataShape>(
       const updateChanges = Object.keys(newState) as Array<
         keyof typeof previousState
       >;
-      if (!deepEqual(take(previousState, updateChanges), currentState)) {
-        currentState = newState;
+      if (!deepEqual(take(previousState, updateChanges), previouState)) {
         applyUpdateToRootLevel(take(newState, getDataKeys()));
       }
     }
@@ -122,14 +121,14 @@ export function createStore<RootDataShape>(
     }
 
     function notifyListener() {
-      listener(currentState);
+      listener(getSlicePart(), deepClone(previouState));
     }
 
     return {
       unsubscriber,
-      setSlicePart,
-      getSlicePart,
-      notifyListener,
+      set: setSlicePart,
+      get: getSlicePart,
+      notify: notifyListener,
     };
   }
 
@@ -142,10 +141,9 @@ export function createStore<RootDataShape>(
     priorityQueue = new Map(priorityQueue);
     priorityQueue.set(listener, subscriberOption);
 
-    return [
-      deleteObjectProp(subscriberOption, 'notifyListener'),
-      priorityQueue,
-    ];
+    //A state notice is been made to the callback on registration
+    subscriberOption.notify();
+    return [deleteObjectProp(subscriberOption, 'notify'), priorityQueue];
   }
 
   function subscriber(
@@ -207,11 +205,11 @@ export function createStore<RootDataShape>(
     );
   }
 
-  function storeUpdateNotifier<
-    NoticeObject extends { notifyListener: UpdateNotifier }
-  >(notices: Array<NoticeObject>) {
+  function storeUpdateNotifier<NoticeObject extends { notify: UpdateNotifier }>(
+    notices: Array<NoticeObject>
+  ) {
     notices.forEach((notice) => {
-      notice.notifyListener();
+      notice.notify();
     });
   }
 
@@ -242,8 +240,8 @@ export function createStore<RootDataShape>(
 
   return {
     subscriber,
-    sliceState,
-    getRootLevelState,
-    setRootLevelState: applyUpdateToRootLevel,
+    slice: sliceState,
+    get: getRootLevelState,
+    set: applyUpdateToRootLevel,
   };
 }

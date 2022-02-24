@@ -4,17 +4,17 @@ export interface Store<Root> {
   subscriber<Slices extends Array<keyof Root>>(
     slice: Slices,
     dataUpdateListener: SliceDataSubscriber<Partial<Pick<Root, Slices[number]>>>
-  ): Omit<UpdateOption<Pick<Root, Slices[number]>>, 'notifyListener'>;
+  ): Omit<UpdateOption<Pick<Root, Slices[number]>>, 'notify'>;
 
-  getRootLevelState(): Partial<Root> | null;
-  setRootLevelState(state: Partial<Root>): void;
-  sliceState<Slices extends Array<keyof Root>>(
+  get(): Partial<Root> | null;
+  set(state: Partial<Root>): void;
+  slice<Slices extends Array<keyof Root>>(
     keys: Slices
   ): Partial<Pick<Root, Slices[number]>> | null;
 }
 
 export interface SliceDataSubscriber<State> {
-  (state: State): void;
+  (state: State, prevState: State): void;
 }
 
 export type SliceDataSubscriberStore<Root> = Set<SliceDataSubscriber<Root>>;
@@ -22,14 +22,14 @@ export type SliceDataSubscriberStore<Root> = Set<SliceDataSubscriber<Root>>;
 export type UpdateOption<State> = {
   unsubscriber(part: keyof State): void;
   unsubscriber(slices: Array<keyof State>): void;
-  setSlicePart(parts: Partial<State>): void;
-  setSlicePart(
+  set(parts: Partial<State>): void;
+  set(
     mappable:
       | Partial<State>
       | ((currentState: Partial<State>) => Partial<State>)
   ): void;
-  getSlicePart(): Partial<State> | null;
-  notifyListener(): void;
+  get(): Partial<State> | null;
+  notify(): void;
 };
 
 export type ItemKeys<State> = Array<keyof State>;
@@ -48,7 +48,7 @@ export type PriorityUpdateQueue<Root> = Map<
 
 export type GetArrayItem<List> = List extends Array<infer T> ? T : never;
 export type NotifyEntry<Root> = [
-  Omit<UpdateOption<Root>, 'notifyListener'>,
+  Omit<UpdateOption<Root>, 'notify'>,
   PriorityUpdateQueue<Root>
 ];
 
