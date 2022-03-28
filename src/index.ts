@@ -2,7 +2,6 @@ import {
   createDataKey,
   deepClone,
   deepEqual,
-  deleteObjectProp,
   immutableShallowMergeState,
   isFunction,
   take,
@@ -22,7 +21,12 @@ import {
   CreateStateFromPreviousFn,
   RevokeAccess,
   NestedDataSlice,
+  UpdateOptionWithNotifier,
 } from './type.js';
+
+export const STATE_DATA_KEYS = Symbol('update_option');
+export const UNNOTIFY_UPDATE_OPTION = Symbol('unnotify_update_option');
+export const SUBSCRIBER_NOTIFIER = Symbol('subscriber_notifier');
 
 function validateNewStoreState(state: any, message: string) {
   if (state == null) return state;
@@ -64,7 +68,7 @@ export function createStore<RootDataShape>(
     );
 
     const { getDataKeys, unsubscriber } = createDataKey(accessRevoker);
-    let previouState: NestedDataSlice<RootDataShape, DataKeys> = deepClone(
+    let previousState: NestedDataSlice<RootDataShape, DataKeys> = deepClone(
       getSlicePart()
     );
 
@@ -95,13 +99,12 @@ export function createStore<RootDataShape>(
       slicePastFn: CreateStateFromPreviousFn<SliceRootState>
     ): void;
     function setSlicePart(slicePart: MappableSlicePart) {
-      let previousState = previouState;
       let newState!: Partial<SliceRootState>;
 
       if (isFunction(slicePart)) {
-        newState = deepClone(slicePart(previouState ?? {}));
+        newState = deepClone(slicePart(previousState ?? {}));
       } else {
-        newState = deepClone(slicePart);
+        newState = deepClone(take(slicePart, getDataKeys()));
       }
       slicePart = validateNewStoreState(
         newState,
@@ -111,7 +114,7 @@ export function createStore<RootDataShape>(
       const updateChanges = Object.keys(newState) as Array<
         keyof typeof previousState
       >;
-      if (!deepEqual(take(previousState, updateChanges), previouState)) {
+      if (!deepEqual(take(previousState, updateChanges), newState)) {
         applyUpdateToRootLevel(take(newState, getDataKeys()));
       }
     }
@@ -121,15 +124,34 @@ export function createStore<RootDataShape>(
     }
 
     function notifyListener() {
-      listener(getSlicePart(), deepClone(previouState));
+      let currentPart = getSlicePart();
+      listener(currentPart, deepClone(previousState));
+      previousState = currentPart;
     }
 
-    return {
+    function scopeUpdateOptionWithLocalData(
+      option: UpdateOption<RootDataShape>
+    ) {
+      return new Proxy(option, {
+        get(target, key, receiver) {
+          if (key === STATE_DATA_KEYS) {
+            return getDataKeys;
+          }
+
+          if (key === SUBSCRIBER_NOTIFIER) {
+            return notifyListener;
+          }
+
+          return Reflect.get(target, key, receiver);
+        },
+      });
+    }
+
+    return scopeUpdateOptionWithLocalData({
       unsubscriber,
       set: setSlicePart,
       get: getSlicePart,
-      notify: notifyListener,
-    };
+    });
   }
 
   function createListenerEntry(
@@ -141,9 +163,7 @@ export function createStore<RootDataShape>(
     priorityQueue = new Map(priorityQueue);
     priorityQueue.set(listener, subscriberOption);
 
-    //A state notice is been made to the callback on registration
-    subscriberOption.notify();
-    return [deleteObjectProp(subscriberOption, 'notify'), priorityQueue];
+    return [subscriberOption, priorityQueue];
   }
 
   function subscriber(
@@ -181,7 +201,7 @@ export function createStore<RootDataShape>(
       changed,
       subscribeRecords,
       prioritySubscriberUpdateQueue
-    );
+    ) as Array<UpdateOptionWithNotifier<RootDataShape>>;
     return void storeUpdateNotifier(updateListeners);
   }
 
@@ -205,11 +225,11 @@ export function createStore<RootDataShape>(
     );
   }
 
-  function storeUpdateNotifier<NoticeObject extends { notify: UpdateNotifier }>(
-    notices: Array<NoticeObject>
-  ) {
+  function storeUpdateNotifier<
+    NoticeObject extends { [SUBSCRIBER_NOTIFIER]: UpdateNotifier }
+  >(notices: Array<NoticeObject>) {
     notices.forEach((notice) => {
-      notice.notify();
+      notice[SUBSCRIBER_NOTIFIER]();
     });
   }
 

@@ -1,3 +1,5 @@
+import { SUBSCRIBER_NOTIFIER } from './index';
+
 export type State = Record<PropertyKey, any>;
 
 export interface Store<Root> {
@@ -29,7 +31,6 @@ export type UpdateOption<State> = {
       | ((currentState: Partial<State>) => Partial<State>)
   ): void;
   get(): Partial<State> | null;
-  notify(): void;
 };
 
 export type ItemKeys<State> = Array<keyof State>;
@@ -70,3 +71,7 @@ export type GetRevokerAccessKey<Revoker> = Revoker extends RevokeAccess<
 >
   ? keyof State
   : never;
+
+export interface UpdateOptionWithNotifier<State> extends UpdateOption<State> {
+  [SUBSCRIBER_NOTIFIER](): void;
+}
